@@ -5,7 +5,7 @@ import sys
 from PyQt4 import QtGui
 from PyQt4 import QtCore
 from .version import __version__, __help_info__, __ydlv__
-from .update import UpdateSelf, test
+from .update import UpdateSelf
 
 class YoutubeDLGui(QtGui.QMainWindow):
     def __init__(self):
@@ -62,17 +62,46 @@ class YoutubeDLGui(QtGui.QMainWindow):
         title = "About Youtube Downloader"
         info_message = self.get_helpinfo() %(self.get_ydlv(), self.get_version())
 
-        info_box = QtGui.QMessageBox()
-        info_box.setText(info_message)
-        info_box.setWindowTitle(title)
-        info_box.setIcon(info_box.Information)
-        ok_button = info_box.addButton("OK", QtGui.QMessageBox.AcceptRole)
-        check1 = test()
+        self.info_box = QtGui.QMessageBox()
+        self.info_box.setText(info_message)
+        self.info_box.setWindowTitle(title)
+        self.info_box.setIcon(self.info_box.Information)
+        ok_button = self.info_box.addButton("OK", QtGui.QMessageBox.AcceptRole)
         if UpdateSelf.check_version() == 1:
-            update_button = info_box.addButton("Update", 
-                                               QtGui.QMessageBox.AcceptRole)
-            check = UpdateSelf()
-        info_box.exec_()
+            update_button = self.info_box.addButton("Update", 
+                                                   QtGui.QMessageBox.AcceptRole)
+            self.connect(update_button, QtCore.SIGNAL("clicked()"), self.update)
+        self.info_box.exec_()
+
+    def update(self):
+        password_infobox = QtGui.QMessageBox()
+        password_infobox.setWindowTitle("Please Enter Your Password:")
+        password_infobox.setIcon(password_infobox.Information)
+        self.begin_button = password_infobox.addButton("OK", QtGui.QMessageBox.AcceptRole)
+        
+       
+        password_box = QtGui.QLineEdit(password_infobox)
+        password_box.setEchoMode(QtGui.QLineEdit.Password)
+        password_box.move(100, 23)
+        password_box.setMaxLength(100)
+        password_infobox.connect(password_box, QtCore.SIGNAL("textChanged(QString)"),  
+                                 self, QtCore.SLOT("text_changed(text)"))
+        password_infobox.connect(self, QtCore.SIGNAL("passwrod_emit()"), 
+                                 self, QtCore.SLOT("button_enable()"))
+        password_infobox.exec_()
+        return
+        check = UpdateSelf()
+        check.start()
+   
+    @QtCore.pyqtSlot()
+    def text_changed(self, text):
+        print "chang"
+        if text is not "":
+            self.emit(QtCore.SIGNAL("password_emit()"))
+
+    @QtCore.pyqtSlot()
+    def button_enable(self):
+        print "helo button"
 
     def get_version(self):
         return __version__

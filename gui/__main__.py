@@ -7,6 +7,11 @@ import os.path
 PATH = os.path.realpath(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(os.path.dirname(PATH)))
 
-import gui
+from gui.main_windows import YoutubeDLGui
+from PyQt4 import QtGui
 
+app = QtGui.QApplication(sys.argv)
+main = YoutubeDLGui()
+main.show()
+sys.exit(app.exec_())
 

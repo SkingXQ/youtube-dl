@@ -17,6 +17,8 @@ YOUTUBE_DL = "youtube-dl"
 
 class UpdateSelf(QThread):
     reenter_password = QtCore.pyqtSignal()
+    update_begin = QtCore.pyqtSignal(QtCore.QString, QtCore.QString)
+    update_end = QtCore.pyqtSignal(QtCore.QString, QtCore.QString)
     def __init__(self, encoding, password, *args):
         QThread.__init__(self, *args) # Why super doesn't work
         self._encoding = encoding
@@ -35,6 +37,7 @@ class UpdateSelf(QThread):
         """ Update youtube-dl with pip command
             TODO: failure catch
         """
+        self.update_begin.emit("Updating", "Updating")
         preexec = os.setsid
         update_self = subprocess.Popen(["sudo -S pip install -U %s" %YOUTUBE_DL],
                                        shell=True, 
@@ -48,12 +51,15 @@ class UpdateSelf(QThread):
             self.reenter_password.emit()
             self.stop(update_self)
             return
+
         while self._proc_is_alive:
             stdout = update_self.stdout.readline().rstrip()
             stdout = stdout.decode(self._encoding, "ignore")
             if self._is_download(stdout):
                 #self._emit(stdout)
                 break
+        update_self.wait()
+        self.update_end.emit("Updated", "Updated")
     
     def stop(self, process):
         """stop subprocess pid , (proces.wait)
@@ -70,7 +76,6 @@ class UpdateSelf(QThread):
     def _is_download(self, stdout):
         return "already" in stdout
     
-
     @classmethod
     def check_version(cls, timeout=30):
         ydlv = UpdateSelf.tuple_version(__ydlv__)     

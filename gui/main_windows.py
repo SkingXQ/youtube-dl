@@ -105,11 +105,25 @@ class YoutubeDLGui(QtGui.QMainWindow):
                                         self)
         self.connect(self.update_thread, QtCore.SIGNAL("reenter_password()"),
                      self.reenter_pw)
+        self.connect(self.update_thread, QtCore.SIGNAL("update_begin(QString, QString)"),
+                     self.update_process)
+        self.connect(self.update_thread, QtCore.SIGNAL("update_end(QString, QString)"),
+                     self.update_process)
         self.update_thread.start()
+
 
     def reenter_pw(self):
         self.password_infobox.setWindowTitle("Wrong Password, Pleas enter again:")
         self.password_infobox.show()
+
+    def update_process(self, title, text):
+        update_info_box = QtGui.QMessageBox(QtGui.QMessageBox.Warning,
+                                             title,
+                                             text,
+                                             QtGui.QMessageBox.NoButton,
+                                             self)
+        update_info_box.show()
+         
 
     def get_preferencode(self):
         """ Get system preferred encode method

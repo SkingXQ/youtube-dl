@@ -1,11 +1,18 @@
 #!/usr/bin/python
 # coding=utf-8
 
+import os
 import sys
+import signal
+
 from PyQt4 import QtGui
 from PyQt4 import QtCore
+
 from .version import __version__, __help_info__, __ydlv__
 from .update import UpdateSelf
+from .update import UpdatePassword
+from .utils import check_internet
+
 
 class YoutubeDLGui(QtGui.QMainWindow):
     def __init__(self):
@@ -29,6 +36,7 @@ class YoutubeDLGui(QtGui.QMainWindow):
 
 
         # Help
+        self.password_infobox = None
         help_menubar = menubar.addMenu("&Help")
         help_acction = self._add_action(["About",
                                          QtCore.SIGNAL("triggered()"),
@@ -58,50 +66,56 @@ class YoutubeDLGui(QtGui.QMainWindow):
         
     def help_messagebox(self):
         """ Show informations(triggered doesn't send data)
+            Bug: if messageBox add two button it won't close when click X
+            Solve method: stackoverflow.com/questions/7543258/adding-detailed-text-in-qmessagebox-makes-close-x-button-disabled
+           
         """  
         title = "About Youtube Downloader"
         info_message = self.get_helpinfo() %(self.get_ydlv(), self.get_version())
 
-        self.info_box = QtGui.QMessageBox()
+        self.info_box = QtGui.QMessageBox(self)
         self.info_box.setText(info_message)
         self.info_box.setWindowTitle(title)
         self.info_box.setIcon(self.info_box.Information)
-        ok_button = self.info_box.addButton("OK", QtGui.QMessageBox.AcceptRole)
         if UpdateSelf.check_version() == 1:
             update_button = self.info_box.addButton("Update", 
-                                                   QtGui.QMessageBox.AcceptRole)
+                                                    QtGui.QMessageBox.RejectRole)
             self.connect(update_button, QtCore.SIGNAL("clicked()"), self.update)
-        self.info_box.exec_()
+        ok_button = self.info_box.addButton("OK", QtGui.QMessageBox.AcceptRole)
+        self.info_box.show()
 
     def update(self):
-        password_infobox = QtGui.QMessageBox()
-        password_infobox.setWindowTitle("Please Enter Your Password:")
-        password_infobox.setIcon(password_infobox.Information)
-        self.begin_button = password_infobox.addButton("OK", QtGui.QMessageBox.AcceptRole)
-        
-       
-        password_box = QtGui.QLineEdit(password_infobox)
-        password_box.setEchoMode(QtGui.QLineEdit.Password)
-        password_box.move(100, 23)
-        password_box.setMaxLength(100)
-        password_infobox.connect(password_box, QtCore.SIGNAL("textChanged(QString)"),  
-                                 self, QtCore.SLOT("text_changed(text)"))
-        password_infobox.connect(self, QtCore.SIGNAL("passwrod_emit()"), 
-                                 self, QtCore.SLOT("button_enable()"))
-        password_infobox.exec_()
+        """
+        """
+        if not self.password_infobox:
+            self.password_infobox = UpdatePassword("Please Enter Your Password:",
+                                                   self)
+        # Make a mistake here , connect before show
+            self.connect(self.password_infobox, 
+                         QtCore.SIGNAL("button_signal(QString)"), 
+                         self.update_thread)
+        self.password_infobox.show()
         return
-        check = UpdateSelf()
-        check.start()
    
-    @QtCore.pyqtSlot()
-    def text_changed(self, text):
-        print "chang"
-        if text is not "":
-            self.emit(QtCore.SIGNAL("password_emit()"))
+    def update_thread(self, text):
+        """ Initial the update_thread
+        """
+        self.update_thread = UpdateSelf(self.get_preferencode(), 
+                                        str(text).strip(), 
+                                        self)
+        self.connect(self.update_thread, QtCore.SIGNAL("reenter_password()"),
+                     self.reenter_pw)
+        self.update_thread.start()
 
-    @QtCore.pyqtSlot()
-    def button_enable(self):
-        print "helo button"
+    def reenter_pw(self):
+        self.password_infobox.setWindowTitle("Wrong Password, Pleas enter again:")
+        self.password_infobox.show()
+
+    def get_preferencode(self):
+        """ Get system preferred encode method
+            TODO: get encode method from system
+        """
+        return "utf-8"
 
     def get_version(self):
         return __version__
@@ -114,6 +128,7 @@ class YoutubeDLGui(QtGui.QMainWindow):
 
 if __name__ == "__main__":
     app = QtGui.QApplication(sys.argv)
-    main = YoutubeDLGui()
+    main =  YoutubeDLGui()
     main.show()
-    sys.exit(app.exec_())
+    app.exec_()
+

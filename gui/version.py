@@ -5,7 +5,8 @@ from youtube_dl.version import __version__ as ydlv
 
 __version__ = "1.0"
 
-__ydlv__ = "2015.12.3.3" #ydlv
+__ydlv__ = ydlv
+
 
 __help_info__ = """<h3>About Youtube DL</h3>
 

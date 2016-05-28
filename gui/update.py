@@ -1,7 +1,9 @@
 #!/usr/bin/python
 #coding=utf-8
 from __future__ import unicode_literals
+import os
 import sys
+import signal
 import urllib2
 import subprocess
 from PyQt4 import QtGui, QtCore
@@ -13,20 +15,14 @@ from .version import __ydlv__
 UPDATE_LINK = "https://yt-dl.org/latest/version"
 YOUTUBE_DL = "youtube-dl"
 
-class UpdateSelf(Thread):
-    def __init__(self):
-        Thread.__init__(self) # Why super doesn't work
-        self._encoding = "utf-8"
+class UpdateSelf(QThread):
+    reenter_password = QtCore.pyqtSignal()
+    def __init__(self, encoding, password, *args):
+        QThread.__init__(self, *args) # Why super doesn't work
+        self._encoding = encoding
+        self.password = password
 
     def run(self):
-        print "update"
-        #password_box = QtGui.QMessageBox()
-        #password_label = QtGui.QLabel(password_box)
-        password_text = QtGui.QLineEdit()
-        password_text.setText("Please Enter your password:")
-        #password_box.exec_()
-        print "line text"
-        return
         check = subprocess.Popen(["pip list |grep %s" %YOUTUBE_DL],
                                  shell=True,
                                  stdin=subprocess.PIPE,
@@ -36,29 +32,35 @@ class UpdateSelf(Thread):
             self.update()
              
     def update(self):
-        print "begin"
+        """ Update youtube-dl with pip command
+            TODO: failure catch
+        """
+        preexec = os.setsid
         update_self = subprocess.Popen(["sudo -S pip install -U %s" %YOUTUBE_DL],
-                                 shell=True, 
-                                 stdin=subprocess.PIPE,
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE)
-        print update_self.stderr.read()
-        print  update_self.stdout.read()
-        return
-        if "sudo" in update_self.stdout.read():
-            password = "sking"
-            update_self.stdin.write(password+"\n")
+                                       shell=True, 
+                                       preexec_fn=preexec,
+                                       stdin=subprocess.PIPE,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE)
+        update_self.stdin.write(self.password+"\n")
+        stderr = update_self.stderr.readline()
+        if "try" in stderr:
+            self.reenter_password.emit()
+            self.stop(update_self)
+            return
         while self._proc_is_alive:
-            stdout = update_self.stdin.readline().rstrip()
+            stdout = update_self.stdout.readline().rstrip()
             stdout = stdout.decode(self._encoding, "ignore")
-            print stdout
-            if self._is_successful(stdout):
-                self._emit(stdout)
+            if self._is_download(stdout):
+                #self._emit(stdout)
                 break
-        print "shi"     
     
-    def stop():
-        pass
+    def stop(self, process):
+        """stop subprocess pid , (proces.wait)
+        """
+        if self._proc_is_alive(process):
+            process.terminate()
+            process.wait()
 
     def _proc_is_alive(self, process):
         if process is None:
@@ -67,6 +69,7 @@ class UpdateSelf(Thread):
 
     def _is_download(self, stdout):
         return "already" in stdout
+    
 
     @classmethod
     def check_version(cls, timeout=30):
@@ -88,36 +91,43 @@ class UpdateSelf(Thread):
 
 
 class UpdatePassword(QtGui.QMessageBox):
-    def __init__(self,):
-        super(self.__class__, self).__init__()
-        self.display()
-   
-    def display(self):
-        self.setWindowTitle("Please Enter Your Password:")
+    update_signal = QtCore.pyqtSignal(int)    
+    button_signal = QtCore.pyqtSignal(QtCore.QString)
+
+    def __init__(self,title, *args):
+        super(self.__class__, self).__init__(*args)
+        self.display(title) 
+  
+    def display(self, title):
+        self.setWindowTitle(title)
         self.setIcon(self.Information)
         self.begin_button = self.addButton("OK", QtGui.QMessageBox.AcceptRole)
+        self.begin_button.setEnabled(False)
 
-
-        password_box = QtGui.QLineEdit(self)
-        password_box.setEchoMode(QtGui.QLineEdit.Password)
-        password_box.move(100, 23)
-        password_box.setMaxLength(100)
-        self.connect(password_box, QtCore.SIGNAL("textChanged(QString)"),
-                     self, QtCore.SLOT("text_changed(str)"))
-       # password_infobox.connect(self, QtCore.SIGNAL("passwrod_emit()"),
-            #                     self, QtCore.SLOT("button_enable()"))
-       # password_infobox.exec_()
-    @QtCore.pyqtSlot(str)
+        self.password_box = QtGui.QLineEdit(self)
+        self.password_box.setEchoMode(QtGui.QLineEdit.Password)
+        self.password_box.move(100, 23)
+        self.password_box.setMaxLength(100)
+        self.connect(self.password_box, QtCore.SIGNAL("textChanged(QString)"),
+                     self.text_changed)
+        self.connect(self, QtCore.SIGNAL("update_signal(int)"),
+                     self.button_enable)
+        self.connect(self.begin_button, QtCore.SIGNAL("clicked()"),
+                     self.button_emit)
+          
+    #@QtCore.pyqtSlot(str) TODO: SLOT doesn't work
     def text_changed(self, text):
-        print "chang"
-        if text is not "":
-            self.emit(QtCore.SIGNAL("password_emit()"))
+        """Text Changed evoke 
+           TODO: input checking
+        """
+        self.update_signal.emit(1 if str(text).strip() else 0)
+    
+    def button_enable(self, enable):
+        """ Enabel the begin button
+        """
+        self.begin_button.setEnabled(True if enable else False)
 
+    def button_emit(self):
+        self.emit(QtCore.SIGNAL("button_signal(QString)"),
+                  QtCore.QString(self.password_box.text()))
 
-if __name__ == "__main__":
-    app = QtGui.QApplication(sys.argv)
-    main =  UpdatePassword()
-    main.show()
-    app.exec_()
-
-        
